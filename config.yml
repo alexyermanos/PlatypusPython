@@ -1,0 +1,3 @@
+mode: # Can be either "VGM","VGM_AB","10X","10X_AB","CSV","help"
+data_path: #Location of data for vgm or csv with sequences
+model: #PLM model
