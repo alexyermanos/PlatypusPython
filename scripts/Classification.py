@@ -11,18 +11,29 @@ from sklearn.pipeline import Pipeline
 from tensorflow.keras.models import Sequential, save_model
 from tensorflow.keras.layers import Dense
 #For Visualization: 
-import matplotlib.pyplot as plt
-import seaborn as sns
+#UnComment for upload: 
+#import matplotlib.pyplot as plt
+#import seaborn as sns
 from tensorflow.keras.models import save_model
 from sklearn.metrics import classification_report, confusion_matrix, multilabel_confusion_matrix, ConfusionMatrixDisplay, roc_curve, auc, RocCurveDisplay
 from itertools import cycle
-
+#For Balancing: 
+from imblearn.over_sampling import RandomOverSampler
+#This Classification function is used to Classify output embeddings from BERT models. 
 #Note: Classification can be Binary of Multi-Class depending on feature labels
-#@param embeddings takes a pd.DataFrame of embeddings as input
+#@param embeddings takes a pd.DataFrame of embeddings as input.
 #@param labels takes a list of feature labels which matches the rows of the embeddings describing the data embedded. 
 #Note: embeddings and labels length must equal rows of embeddings. 
-#@Arg 'Eval_size' Default is 0.1, input must be between 0-1. 
-# The Eval size is the percentage of data used to Evaluate the models performance, 0.1 = 10% of the embeddings. 
+#@param 'eval_size' Default is 0.1, input must be between 0-1. 
+#The eval size is the percentage of data used to Evaluate the models performance, 0.1 = 10% of the embeddings. 
+#@param 'balancing' takes a boolean as input: default is True.
+#Balacing does RandomOverSampling of all minority classes so that the number of minority equals majority class.
+#@param 'epochs' takes a numeric input: Default is 3 times the number of embedding columns
+#Epochs dictates how many passes the model will undergo during configuration, used to update weight, bias, and parameter optimization.
+#@param 'nodes' takes a numeric input: Default is 1/2 the number of embedding columns.
+#Influences how many nodes will consist in the single layered neural network. 
+#@param 'batch_size' takes a numeric value: Default is 32.
+#the batch size determines how many training samples are processed together. 
 
 # @EXAMPLE:
 #import Classification.py as clf
@@ -31,20 +42,28 @@ from itertools import cycle
 # labels = metadata['labels']
 # clf.get_Classification(embeddings, labels) 
 # or 
-# clf.get_Classification(embeddings, labels, Eval_size=0.2)
+# clf.get_Classification(embeddings, labels, balancing=False, eval_size=0.2, epochs = 200, nodes = 100, batch_size= 16)
 
 
-def get_Classification(embeddings, labels, Eval_size=0.1):
-    plt_labels = list(set(labels))
-    #make the model and subset Evaluation Data:
-    model, history, X_eval, Y_eval = make_Model(embeddings, labels, Eval_size)
+def get_Classification(embeddings, labels, balancing=True, eval_size=0.1, epochs=0, nodes=0, batch_size=32):
+    #Default epochs is three times the number of columns 
+    if(epochs == 0): 
+        epochs = len(embeddings.columns)*3
+    #Default nodes is one half the number of columns 
+    if(nodes == 0):
+        nodes = int(len(embeddings.columns)/2)
+    plt_labels = list(np.unique(labels))
+    #Make Model and Subset Evaluation Data
+    model, X_eval, Y_eval = make_Model(embeddings, labels, balancing = balancing, eval_size = eval_size, epochs = epochs,
+                                                nodes = nodes, batch_size = batch_size)
     Y_eval = np.array(Y_eval)
-    #Evaluate Model Performance:
+    #Run evalauation subset on model and make confusion matrices
     Y_pred = get_CM(model, X_eval, Y_eval, plt_labels)
+    #Get ROC_AUC curves (Macro, Micro, and each class vs rest) 
     get_ROC(Y_eval, Y_pred, plt_labels)
     
 #Input Embeddings (DF) and labels (Array)
-def make_Model(embeddings, labels, Eval_size=0.1):
+def make_Model(embeddings, labels, balancing, eval_size, epochs, nodes, batch_size):
     X = np.array(embeddings)
     #Encode labels: 
     encoder = LabelEncoder()
@@ -53,43 +72,50 @@ def make_Model(embeddings, labels, Eval_size=0.1):
     if(len(set(labels))>2):
         print('one-hot encoding labels for Multi-class Classification')
         Y = np_utils.to_categorical(Y)
+        print(np.unique(labels).tolist())
     X = X.astype(float)
-    #split test and training:
-    X, X_eval, Y, Y_eval = train_test_split(X, Y, test_size = Eval_size)
-    X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size = 0.2)
-    #Run model:
+    #Split evaluation sets:
+    X, X_eval, Y, Y_eval = train_test_split(X, Y, test_size = eval_size, random_state = 42)
+    #Optional Balancing: Random Over Sampling of all classes but highest
+    if(balancing == True):
+            oversample = RandomOverSampler(sampling_strategy='not majority')
+            X, Y = oversample.fit_resample(X, Y)
+    #Split training and test sets: 
+    X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size = 0.2, random_state = 42)
+    #Run Model:
+    #If Binary Classification:
     if(len(set(labels))==2):
         print("Running Binary Classification")
         model = Sequential()
-        model.add(Dense((len(embeddings.columns)*3), input_dim=(len(embeddings.columns)), activation='relu'))
+        model.add(Dense(nodes, input_dim=(len(embeddings.columns)), activation='relu'))
         model.add(Dense(1, activation='sigmoid'))
         model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
-        history = model.fit(X_train, Y_train, batch_size = 32, verbose = 1,
-                    epochs = (len(embeddings.columns)*3), validation_data = (X_test, Y_test), shuffle = False)
+        history = model.fit(X_train, Y_train, batch_size = batch_size, verbose = 1,
+                    epochs = epochs, validation_data = (X_test, Y_test), shuffle = False)
         _, accuracy = model.evaluate(X_test,Y_test)
         print("Accuracy = ", (accuracy*100),"%")
-        return model, history.history, X_eval, Y_eval
+        return model, X_eval, Y_eval
+    #If Multi-class Classification: 
     elif(len(set(labels))>2):
         print("Running Multi-class Classification")
         model = Sequential()
-        model.add(Dense((len(embeddings.columns)*3), input_dim=(len(embeddings.columns)), activation='relu'))
+        model.add(Dense(nodes, input_dim=(len(embeddings.columns)), activation='relu'))
         model.add(Dense(len(set(labels)), activation='softmax'))
         model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
-        history = model.fit(X_train, Y_train, batch_size = 32, verbose = 1,
-                    epochs = (len(embeddings.columns)*3), shuffle = False)
+        history = model.fit(X_train, Y_train, batch_size = batch_size, verbose = 1,
+                    epochs = epochs, shuffle = False)
         _, accuracy = model.evaluate(X_test,Y_test)
         print("Accuracy = ", (accuracy*100),"%")
-        return model, history.history, X_eval, Y_eval
+        return model, X_eval, Y_eval
     
 def get_CM(model, X_test, Y_act, labels):
     if(len(labels) > 2):
         print('Multi-Class Confusion Matrix')
         Y_pred = model.predict(X_test)
-        print('Complete Confusion Matrix')
+        #print('Complete Confusion Matrix')
         cm = confusion_matrix(Y_act.argmax(axis=1),Y_pred.argmax(axis=1))
         cm_df = pd.DataFrame(cm, index = labels, columns = labels)
-        plt.figure(figsize=((len(labels)+1),len(labels)))
-        sns.heatmap(cm_df, annot=True)
+        print('cm_df ',cm_df)
         #Sum confusion Matrices
         mcm = multilabel_confusion_matrix(Y_act.argmax(axis=1),Y_pred.argmax(axis=1))
         cm = [[0,0],[0,0]]
@@ -102,12 +128,12 @@ def get_CM(model, X_test, Y_act, labels):
         print('Binary Confusion Matrix')
         Y_pred = model.predict(X_test)
         cm = confusion_matrix(Y_act.argmax(axis=1), Y_pred.argmax(axis=1), labels = np.unique(Y_act))
+        print('cm ',cm)
         ConfusionMatrixDisplay(confusion_matrix=cm, display_labels= np.unique(Y_act)).plot()
         plt.show()
         return Y_pred
 
 def get_ROC(Y_act, Y_pred, labels):
-    #Y_pred = model.predict(X_test)
     if(len(labels)==2):
         #Binary ROC
         print('Binary')
@@ -131,18 +157,21 @@ def get_ROC(Y_act, Y_pred, labels):
             fpr[i], tpr[i], _ = roc_curve(Y_act[:, i], Y_pred[:, i])
             roc_auc[i] = auc(fpr[i], tpr[i])
             fpr_grid = np.linspace(0.0, 1.0, 1000)
+            #print("roc_auc for", labels[i]," is ",roc_auc[i])
+
         # Interpolate all ROC curves at these points
         mean_tpr = np.zeros_like(fpr_grid)
         for i in range(len(Y_act[1])):
             mean_tpr += np.interp(fpr_grid, fpr[i], tpr[i])  # linear interpolation
-        
+            
         # Macro-Average it and compute AUC
         mean_tpr /= len(list(set(labels)))
         fpr["macro"] = fpr_grid
         tpr["macro"] = mean_tpr
         roc_auc["macro"] = auc(fpr["macro"], tpr["macro"])
-        
-        #Plot Micro-average + Macro-average + Class performances, Respectively: 
+        #Plot Micro-average + Macro-average + Class performances, Respectively:
+        #print('roc_auc Micro', roc_auc['micro'])
+        #print('roc_auc Macro', roc_auc['macro'])
         fig, ax = plt.subplots(figsize=(6, 6))
         plt.plot(
             fpr["micro"],
