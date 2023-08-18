@@ -11,7 +11,6 @@ from sklearn.pipeline import Pipeline
 from tensorflow.keras.models import Sequential, save_model
 from tensorflow.keras.layers import Dense
 #For Visualization: 
-#UnComment for upload: 
 import matplotlib.pyplot as plt
 import seaborn as sns
 from tensorflow.keras.models import save_model
