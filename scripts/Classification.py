@@ -11,6 +11,9 @@ from sklearn.pipeline import Pipeline
 from tensorflow.keras.models import Sequential, save_model
 from tensorflow.keras.layers import Dense
 from sklearn.svm import SVC
+from sklearn.naive_bayes import GaussianNB
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
 #For Visualization: 
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -46,10 +49,10 @@ from sklearn.preprocessing import StandardScaler
 # labels = metadata['labels']
 # clf.get_Classification(embeddings, labels) 
 # or 
-# clf.get_Classification(embeddings, labels, balancing=False, eval_size=0.2, epochs = 200, nodes = 100, batch_size= 16, scaling=False)
+# clf.get_Classification(embeddings, labels, balancing=False, eval_size=0.2, epochs = 200, nodes = 100, batch_size= 16, scaling=True)
 
 
-def get_Classification(embeddings, labels, balancing=False, eval_size=0.1, epochs=0, nodes=0, batch_size=32, scaling=True):
+def get_Classification(embeddings, labels, balancing=False, eval_size=0.1, epochs=0, nodes=0, batch_size=32, scaling=False):
     #Default epochs is three times the number of columns 
     if(epochs == 0): 
         epochs = len(embeddings.columns)*3
@@ -63,14 +66,40 @@ def get_Classification(embeddings, labels, balancing=False, eval_size=0.1, epoch
     Y_eval = np.array(Y_eval)
     #Run evalauation subset on model and make confusion matrices
     Y_pred = model.predict(X_eval)
-    get_CM(Y_eval.argmax(axis=1), Y_pred.argmax(axis=1), plt_labels)
-    #Get ROC_AUC curves (Macro, Micro, and each class vs rest) 
-    get_ROC(Y_eval, Y_pred, plt_labels)
+    if(len(plt_labels) == 2):
+        nn_cm = get_CM(Y_eval, np.round(Y_pred.max(axis=1)).astype(int), plt_labels)
+    else:
+        nn_cm = get_CM(Y_eval.argmax(axis=1), Y_pred.argmax(axis=1), plt_labels)
     #Make SVM and get Confusion matrices
-    model_SVM, X_eval, Y_eval = make_SVM(embeddings, labels, balancing, scale=scaling)
-    Y_pred = model_SVM.predict(X_eval)
-    get_CM(Y_eval, Y_pred, plt_labels)
-    
+    print('Making SVM Model')
+    SVM_test, SVM_pred = make_model('SVM', embeddings, labels, eval_size, balancing, scaling)
+    svm_cm = get_CM(SVM_test, SVM_pred, plt_labels)
+    print('Making Random Forest Model')
+    RF_test, RF_pred = make_model('RF', embeddings, labels, eval_size, balancing, scaling)
+    rf_cm = get_CM(RF_test, RF_pred, plt_labels)
+    print('Making Gaussian Naive Bayes Model')
+    GNB_test, GNB_pred = make_model('GNB', embeddings, labels, eval_size, balancing, scaling)
+    gnb_cm = get_CM(GNB_test, GNB_pred, plt_labels)
+    print('Making Logistic Regression Model') 
+    LGR_test, LGR_pred = make_model('LOGREG', embeddings, labels, eval_size, balancing, scaling)
+    lgr_cm = get_CM(LGR_test, LGR_pred, plt_labels)
+    fig, axes = plt.subplots(nrows=2, ncols=3, figsize=(10, 8))
+    #Making subplot of all model Confusion Matrices: 
+    cm_list = [nn_cm, svm_cm, rf_cm, gnb_cm, lgr_cm]
+    titles = ['Neural Network','SVM', 'Random Forest', 'GaussianNB', 'Logistic Regression']
+    for i, ax in enumerate(axes.flatten()):
+        if i < len(cm_list):
+            disp = cm_list[i]
+            disp.plot(cmap=plt.cm.Blues, ax=ax, values_format=".0f")
+            disp.ax_.set_title(titles[i])
+            disp.im_.colorbar.remove()
+            ax.set_xticklabels(plt_labels, rotation=45, ha="right")
+        if i >= len(cm_list):
+            ax.axis("off")
+    plt.tight_layout()
+    plt.show()
+    #Making ROCs for model perfomances
+
 #Input Embeddings (DF) and labels (Array)
 def make_NN(embeddings, labels, balancing, eval_size, epochs, nodes, batch_size, scale):
     X = np.array(embeddings)
@@ -79,7 +108,6 @@ def make_NN(embeddings, labels, balancing, eval_size, epochs, nodes, batch_size,
     encoder.fit(labels)
     Y = encoder.transform(labels)
     if(len(set(labels))>2):
-        #print('one-hot encoding labels for Multi-class Classification')
         Y = np_utils.to_categorical(Y)
     X = X.astype(float)
     #Split evaluation sets:
@@ -123,26 +151,9 @@ def make_NN(embeddings, labels, balancing, eval_size, epochs, nodes, batch_size,
         return model, X_eval, Y_eval
     
 def get_CM(Y_act, Y_pred, labels):
-    if(len(labels) > 2):
-        print('Multi-Class Confusion Matrix')
-        #print('Complete Confusion Matrix')
-        cm = confusion_matrix(Y_act, Y_pred)
-        #print('cm' ,cm)
-        cm_df = pd.DataFrame(cm, index = labels, columns = labels)
-        #print('cm_df ',cm_df)
-        #Sum confusion Matrices
-        mcm = multilabel_confusion_matrix(Y_act,Y_pred)
-        cm = [[0,0],[0,0]]
-        for i in mcm: 
-            cm += i
-        ConfusionMatrixDisplay(confusion_matrix=cm, display_labels= np.unique(Y_act)).plot()
-        plt.show()
-    elif(len(labels)==2):
-        print('Binary Confusion Matrix')
-        cm = confusion_matrix(Y_act, Y_pred, labels = np.unique(Y_act))
-        #print('cm ',cm)
-        ConfusionMatrixDisplay(confusion_matrix=cm, display_labels= np.unique(Y_act)).plot()
-        plt.show()
+    cm = confusion_matrix(Y_act, Y_pred, labels = np.unique(Y_act))
+    cm = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels= labels)
+    return cm
 
 def get_ROC(Y_act, Y_pred, labels):
     if(len(labels)==2):
@@ -215,33 +226,72 @@ def get_ROC(Y_act, Y_pred, labels):
         plt.legend()
         plt.show()
 
-def make_SVM(embeddings, labels, balancing, scale): 
+def make_SVM(X_train, Y_train): 
+    if(len(np.unique(Y_train)) > 2):
+        model = SVC(decision_function_shape='ovo')
+        model.fit(X_train, Y_train)
+        print(f'SVM Training Accuracy - :{model.score(X_train, Y_train):.3f}')
+        return model
+    elif(len(np.unique(Y_train)) == 2):
+        model = SVC(gamma = 'auto')
+        model.fit(X_train, Y_train)
+        print(f'SVM Training Accuracy - :{model.score(X_train, Y_train):.3f}')
+        return model
+
+def make_RF(X_train, Y_train):
+    model = RandomForestClassifier()
+    model.fit(X_train, Y_train)
+    print(f'Random Forest Training Accuracy - :{model.score(X_train, Y_train):.3f}')
+    return model
+
+def make_GNB(X_train, Y_train):
+    model = GaussianNB()
+    model.fit(X_train, Y_train)
+    print(f'Gaussian Naive Bayes Training Accuracy - :{model.score(X_train, Y_train):.3f}')
+    return model
+
+def make_LogReg(X_train, Y_train):
+    model = LogisticRegression()
+    model.fit(X_train, Y_train)
+    print(f'Logistic Regression Training Accuracy - :{model.score(X_train, Y_train):.3f}')
+    return model
+
+def make_model(model, embeddings, labels, eval_size, balancing, scaling):
     X = np.array(embeddings)
     encoder = LabelEncoder()
     encoder.fit(labels)
     Y = encoder.transform(labels)
     X = X.astype(float)
-    X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size = 0.2, random_state = 42)
+    X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size = eval_size, random_state = 42)
     #Optional Balancing:
     if(balancing == True):
+        print('Balancing Data...')
         oversample = RandomOverSampler(sampling_strategy='not majority')
         X, Y = oversample.fit_resample(X, Y)
     #Optional Scaling:
-    if(scale == True):
+    if(scaling == True):
+        print('Scaling Data...')
         scaler = StandardScaler()
         X_train = scaler.fit_transform(X_train)
         X_test = scaler.transform(X_test)
-    if(len(labels) > 2):
-        print('Multi-class SVM')
-        model = SVC(decision_function_shape='ovo')
-        model.fit(X_train, Y_train)
-        print(f'SVM Training Accuracy - :{model.score(X_train, Y_train):.3f}')
+    #Make specificied models: 
+    if(model == 'SVM'):
+        model = make_SVM(X_train, Y_train)
+        Y_pred = model.predict(X_test)
         print(f'SVM Test Accuracy - :{model.score(X_test, Y_test):.3f}')
-        return model, X_test, Y_test
-    elif(len(labels) == 2):
-        print('Binary SVM')
-        model = SVC(gamma = 'auto')
-        model.fit(X_train, Y_train)
-        print(f'SVM Training Accuracy - :{model.score(X_train, Y_train):.3f}')
-        print(f'SVM Test Accuracy - :{model.score(X_test, Y_test):.3f}')
-        return model, X_test, Y_test
+        return Y_test, Y_pred
+    elif(model == 'RF'):
+        model = make_RF(X_train, Y_train)
+        Y_pred = model.predict(X_test)
+        print(f'Random Forest Test Accuracy - :{model.score(X_test, Y_test):.3f}')
+        return Y_test, Y_pred
+    elif(model == 'GNB'):
+        model = make_GNB(X_train, Y_train)
+        Y_pred = model.predict(X_test)
+        print(f'GNB Test Accuracy - :{model.score(X_test, Y_test):.3f}')
+        return Y_test, Y_pred
+    elif(model == 'LOGREG'):
+        model = make_LogReg(X_train, Y_train)
+        Y_pred = model.predict(X_test)
+        print(f' Logistic Regression Test Accuracy - :{model.score(X_test, Y_test):.3f}')
+        return Y_test, Y_pred
