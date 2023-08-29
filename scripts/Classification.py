@@ -171,7 +171,6 @@ def make_NN(embeddings, labels, balancing, eval_size, epochs, nodes, batch_size,
     
 def get_CM(Y_act, Y_pred, labels):
     cm = confusion_matrix(Y_act, Y_pred, labels = np.unique(Y_act))
-    print(cm)
     cm = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels= labels)
     return cm
 
