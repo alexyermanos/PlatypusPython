@@ -5,6 +5,7 @@ from keras.models import Sequential
 from keras.layers import Dense
 from keras.wrappers.scikit_learn import KerasClassifier
 from keras.utils import np_utils
+from keras.callbacks import EarlyStopping
 from sklearn.model_selection import cross_val_score, KFold, StratifiedKFold, train_test_split
 from sklearn.preprocessing import LabelEncoder
 from sklearn.pipeline import Pipeline
@@ -14,11 +15,9 @@ from sklearn.svm import SVC
 from sklearn.naive_bayes import GaussianNB
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
-#For Visualization: 
-import matplotlib.pyplot as plt
-import seaborn as sns
 from tensorflow.keras.models import save_model
-from sklearn.metrics import classification_report, confusion_matrix, multilabel_confusion_matrix, ConfusionMatrixDisplay, roc_curve, auc, RocCurveDisplay
+from sklearn.metrics import classification_report, confusion_matrix, multilabel_confusion_matrix
+from sklearn.metrics import ConfusionMatrixDisplay, roc_curve, auc, RocCurveDisplay
 from itertools import cycle
 #For Balancing and Scaling: 
 from imblearn.over_sampling import RandomOverSampler
@@ -49,10 +48,10 @@ from sklearn.preprocessing import StandardScaler
 # labels = metadata['labels']
 # clf.get_Classification(embeddings, labels) 
 # or 
-# clf.get_Classification(embeddings, labels, balancing=False, eval_size=0.2, epochs = 200, nodes = 100, batch_size= 16, scaling=True)
+# clf.get_Classification(embeddings, labels, balancing=False, eval_size=0.2, epochs = 200, nodes = 100, batch_size= 16, scaling=True, display = True)
 
 
-def get_Classification(embeddings, labels, balancing=False, eval_size=0.1, epochs=0, nodes=0, batch_size=32, scaling=False):
+def get_Classification(embeddings, labels, balancing=False, eval_size=0.1, epochs=0, nodes=0, batch_size=32, scaling=False, display=False, patience=25):
     #Default epochs is three times the number of columns 
     if(epochs == 0): 
         epochs = len(embeddings.columns)*3
@@ -62,46 +61,59 @@ def get_Classification(embeddings, labels, balancing=False, eval_size=0.1, epoch
     plt_labels = list(np.unique(labels))
     #Make Model and Subset Evaluation Data
     model, X_eval, Y_eval = make_NN(embeddings, labels, balancing = balancing, eval_size = eval_size, epochs = epochs,
-                                                nodes = nodes, batch_size = batch_size, scale = scaling)
+                                                nodes = nodes, batch_size = batch_size, scale = scaling, patience = patience)
     Y_eval = np.array(Y_eval)
-    #Run evalauation subset on model and make confusion matrices
+    #Get probabilites from NN
     Y_pred = model.predict(X_eval)
     if(len(plt_labels) == 2):
-        nn_cm = get_CM(Y_eval, np.round(Y_pred.max(axis=1)).astype(int), plt_labels)
+        print('NN Report', classification_report(Y_eval, np.round(Y_pred).astype(int), target_names = plt_labels))
     else:
-        nn_cm = get_CM(Y_eval.argmax(axis=1), Y_pred.argmax(axis=1), plt_labels)
-    #Make SVM and get Confusion matrices
+        print('NN Report', classification_report(Y_eval.argmax(axis = 1), Y_pred.argmax(axis=1), target_names = plt_labels))
+    
+    #Make SVM and probabilites
     print('Making SVM Model')
-    SVM_test, SVM_pred = make_model('SVM', embeddings, labels, eval_size, balancing, scaling)
-    svm_cm = get_CM(SVM_test, SVM_pred, plt_labels)
+    Y_test, SVM_pred = make_model('SVM', embeddings, labels, eval_size, balancing, scaling)
+    print('SVM Report',classification_report(Y_test, prob2pred(SVM_pred, len(plt_labels)), target_names = plt_labels))
     print('Making Random Forest Model')
-    RF_test, RF_pred = make_model('RF', embeddings, labels, eval_size, balancing, scaling)
-    rf_cm = get_CM(RF_test, RF_pred, plt_labels)
+    RF_pred = make_model('RF', embeddings, labels, eval_size, balancing, scaling)
+    print('RF Report',classification_report(Y_test, prob2pred(RF_pred, len(plt_labels)), target_names = plt_labels))
     print('Making Gaussian Naive Bayes Model')
-    GNB_test, GNB_pred = make_model('GNB', embeddings, labels, eval_size, balancing, scaling)
-    gnb_cm = get_CM(GNB_test, GNB_pred, plt_labels)
+    GNB_pred = make_model('GNB', embeddings, labels, eval_size, balancing, scaling)
+    print('GNB Report', classification_report(Y_test, prob2pred(GNB_pred, len(plt_labels)), target_names = plt_labels))
     print('Making Logistic Regression Model') 
-    LGR_test, LGR_pred = make_model('LOGREG', embeddings, labels, eval_size, balancing, scaling)
-    lgr_cm = get_CM(LGR_test, LGR_pred, plt_labels)
-    fig, axes = plt.subplots(nrows=2, ncols=3, figsize=(10, 8))
-    #Making subplot of all model Confusion Matrices: 
-    cm_list = [nn_cm, svm_cm, rf_cm, gnb_cm, lgr_cm]
-    titles = ['Neural Network','SVM', 'Random Forest', 'GaussianNB', 'Logistic Regression']
-    for i, ax in enumerate(axes.flatten()):
-        if i < len(cm_list):
-            disp = cm_list[i]
-            disp.plot(cmap=plt.cm.Blues, ax=ax, values_format=".0f")
-            disp.ax_.set_title(titles[i])
-            disp.im_.colorbar.remove()
-            ax.set_xticklabels(plt_labels, rotation=45, ha="right")
-        if i >= len(cm_list):
-            ax.axis("off")
-    plt.tight_layout()
-    plt.show()
-    #Making ROCs for model perfomances
+    LGR_pred = make_model('LOGREG', embeddings, labels, eval_size, balancing, scaling)
+    print('LGR Report', classification_report(Y_test, prob2pred(LGR_pred, len(plt_labels)), target_names = plt_labels))
+    if(display == True):
+        #NN Confusion Matrices: 
+        if(len(plt_labels) == 2):
+            nn_cm = get_CM(Y_eval, np.round(Y_pred.max(axis=1)).astype(int), plt_labels)
+        else:
+            nn_cm = get_CM(Y_eval.argmax(axis=1), Y_pred.argmax(axis=1), plt_labels)
+        #SVM Confusion Matrices: 
+        svm_cm = get_CM(Y_test, prob2pred(SVM_pred, len(plt_labels)), plt_labels)
+        #RF Confusion Matrices:
+        rf_cm = get_CM(Y_test, prob2pred(RF_pred, len(plt_labels)), plt_labels)
+        #GNB Confusion Matrix
+        gnb_cm = get_CM(Y_test, prob2pred(GNB_pred, len(plt_labels)), plt_labels)
+        #LGR Confusion Matrix
+        lgr_cm = get_CM(Y_test, prob2pred(LGR_pred, len(plt_labels)), plt_labels)
+        #Plot Confusion Matrices
+        plot_cms([nn_cm, svm_cm, rf_cm, gnb_cm, lgr_cm], plt_labels)
+        #Plot ROCs 
+        if(len(plt_labels)==2):
+            make_ROC(Y_eval, [Y_pred,SVM_pred[:,1], RF_pred[:,1], GNB_pred[:,1], LGR_pred[:,1]], plt_labels)
+        else: 
+            make_ROC(Y_eval, [Y_pred,SVM_pred, RF_pred, GNB_pred, LGR_pred], plt_labels)
+
+#Coverts probabilites to predictions 
+def prob2pred(Y_prob, count):
+    if(count == 2):
+        return np.round(Y_prob[:,1]).astype(int)
+    else:
+        return Y_prob.argmax(axis=1)
 
 #Input Embeddings (DF) and labels (Array)
-def make_NN(embeddings, labels, balancing, eval_size, epochs, nodes, batch_size, scale):
+def make_NN(embeddings, labels, balancing, eval_size, epochs, nodes, batch_size, scale, patience):
     X = np.array(embeddings)
     #Encode labels: 
     encoder = LabelEncoder()
@@ -128,112 +140,125 @@ def make_NN(embeddings, labels, balancing, eval_size, epochs, nodes, batch_size,
     #If Binary Classification:
     if(len(set(labels))==2):
         print("Running Binary Classification")
+        callback = EarlyStopping(monitor='val_loss', patience=patience, mode = 'min')
         model = Sequential()
         model.add(Dense(nodes, input_dim=(len(embeddings.columns)), activation='relu'))
         model.add(Dense(1, activation='sigmoid'))
         model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
         model.fit(X_train, Y_train, batch_size = batch_size, verbose = 1,
-                    epochs = epochs, validation_data = (X_test, Y_test), shuffle = False)
+                    epochs = epochs, validation_data = (X_test, Y_test), callbacks=[callback], shuffle = False)
         _, accuracy = model.evaluate(X_test,Y_test)
         print("Accuracy = ", (accuracy*100),"%")
         return model, X_eval, Y_eval
-    #If Multi-class Classification: 
+     #If Multi-class Classification:
     elif(len(set(labels))>2):
         print("Running Multi-class Classification")
+        callback = EarlyStopping(monitor='val_loss', patience=patience, mode = 'min')
         model = Sequential()
         model.add(Dense(nodes, input_dim=(len(embeddings.columns)), activation='relu'))
         model.add(Dense(len(set(labels)), activation='softmax'))
         model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
         model.fit(X_train, Y_train, batch_size = batch_size, verbose = 1,
-                    epochs = epochs, shuffle = False)
-        _, accuracy = model.evaluate(X_test,Y_test)
-        print("Accuracy = ", (accuracy*100),"%")
+                    epochs = epochs, validation_data = (X_test, Y_test), callbacks=[callback], shuffle = False)
+        _, accuracy = model.evaluate(X_eval,Y_eval)
+        print("Neural Network Eval Accuracy = ", (accuracy*100),"%")
         return model, X_eval, Y_eval
     
 def get_CM(Y_act, Y_pred, labels):
     cm = confusion_matrix(Y_act, Y_pred, labels = np.unique(Y_act))
+    print(cm)
     cm = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels= labels)
     return cm
 
-def get_ROC(Y_act, Y_pred, labels):
+def make_ROC(Y_test, prob_list, labels):
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    #Calculate Binary ROCs
     if(len(labels)==2):
-        #Binary ROC
-        print('Binary')
-        fpr, tpr, thresholds = roc_curve(Y_act, Y_pred)
-        plt.figure(1)
-        plt.plot([0,1],[0,1], 'y--')
-        plt.plot(fpr,tpr,marker='.')
-        plt.xlabel('False positive rate')
-        plt.ylabel('True positive rate')
-        plt.title('ROC curve')
+        fpr, tpr, roc_auc_model = [], [], []
+        for i in range(len(prob_list)):
+            fprt, tprt, thresholdst = roc_curve(Y_test, prob_list[i])
+            auct = auc(fprt, tprt)
+            fpr.append(fprt)
+            tpr.append(tprt)
+            roc_auc_model.append(auct)
+        plt.figure()
+        plt.plot(fpr[0], tpr[0], color='darkorange', lw=2, label=f'Neural Network (AUC = {roc_auc_model[0]:.2f})')
+        plt.plot(fpr[1], tpr[1], color='green', lw=2, label=f'SVM (AUC = {roc_auc_model[1]:.2f})')
+        plt.plot(fpr[2], tpr[2], color='blue', lw=2, label=f'Random Forest (AUC = {roc_auc_model[2]:.2f})')
+        plt.plot(fpr[3], tpr[3], color='red', lw=2, label=f'Gaussian NB (AUC = {roc_auc_model[3]:.2f})')
+        plt.plot(fpr[4], tpr[4], color='purple', lw=2, label=f'Logistic Regression (AUC = {roc_auc_model[4]:.2f})')
+        plt.plot([0, 1], [0, 1], color='black', lw=2, linestyle='--')
+        plt.xlim([0.0, 1.0])
+        plt.ylim([0.0, 1.05])
+        plt.xlabel('False Positive Rate')
+        plt.ylabel('True Positive Rate')
+        plt.title('Receiver Operating Characteristic (ROC)')
+        plt.legend(loc='lower right')
         plt.show()
-    elif(len(labels) > 2):
-        #Multi-class ROC
-        fpr, tpr, roc_auc = dict(), dict(), dict()
-        # Compute micro-average ROC curve and ROC area
-        fpr["micro"], tpr["micro"], _ = roc_curve(Y_act.ravel(), Y_pred.ravel())
-        roc_auc["micro"] = auc(fpr["micro"], tpr["micro"])
-        #Compute Class ROC/AUCs 
-        for i in range(len(Y_act[1])):
-            fpr[i], tpr[i], _ = roc_curve(Y_act[:, i], Y_pred[:, i])
-            roc_auc[i] = auc(fpr[i], tpr[i])
+    elif(len(labels)>2):
+        #Calculate Micro-Averages: 
+        fpr_mi, tpr_mi, auc_mi = [], [], []
+        for i in range(len(prob_list)):
+            fpr_mi_temp, tpr_mi_temp, _ = roc_curve(Y_test.ravel(), prob_list[i].ravel())
+            auc_mi_temp = auc(fpr_mi_temp, tpr_mi_temp)
+            fpr_mi.append(fpr_mi_temp)
+            tpr_mi.append(tpr_mi_temp)
+            auc_mi.append(auc_mi_temp)
+        plt.figure()
+        plt.plot(fpr_mi[0], tpr_mi[0], color='darkorange', lw=2, label=f'Neural Network (AUC = {auc_mi[0]:.2f})')
+        plt.plot(fpr_mi[1], tpr_mi[1], color='green', lw=2, label=f'SVM (AUC = {auc_mi[1]:.2f})')
+        plt.plot(fpr_mi[2], tpr_mi[2], color='blue', lw=2, label=f'Random Forest (AUC = {auc_mi[2]:.2f})')
+        plt.plot(fpr_mi[3], tpr_mi[3], color='red', lw=2, label=f'Gaussian NB (AUC = {auc_mi[3]:.2f})')
+        plt.plot(fpr_mi[4], tpr_mi[4], color='purple', lw=2, label=f'Logistic Regression (AUC = {auc_mi[4]:.2f})')
+        plt.plot([0, 1], [0, 1], color='black', lw=2, linestyle='--')
+        plt.xlim([0.0, 1.0])
+        plt.ylim([0.0, 1.05])
+        plt.xlabel('False Positive Rate')
+        plt.ylabel('True Positive Rate')
+        plt.title('Micro-Average Receiver Operating Characteristic (ROC)')
+        plt.legend(loc='lower right')
+        plt.show()
+        #Calculate Macro-Averages
+        n_classes = len(Y_test[1])
+        fpr_ma, tpr_ma, auc_ma = [], [], []
+        for n in range(len(prob_list)):
+            fpr, tpr, roc_auc = dict(), dict(), dict()
+            for i in range(n_classes):
+                fpr[i], tpr[i], _ = roc_curve(Y_test[:, i], prob_list[n][:, i])
+                roc_auc[i] = auc(fpr[i], tpr[i])
             fpr_grid = np.linspace(0.0, 1.0, 1000)
-            #print("roc_auc for", labels[i]," is ",roc_auc[i])
-        # Interpolate all ROC curves at these points
-        mean_tpr = np.zeros_like(fpr_grid)
-        for i in range(len(Y_act[1])):
-            mean_tpr += np.interp(fpr_grid, fpr[i], tpr[i])  # linear interpolation
-        # Macro-Average it and compute AUC
-        mean_tpr /= len(list(set(labels)))
-        fpr["macro"] = fpr_grid
-        tpr["macro"] = mean_tpr
-        roc_auc["macro"] = auc(fpr["macro"], tpr["macro"])
-        #Plot Micro-average + Macro-average + Class performances, Respectively:
-        #print('roc_auc Micro', roc_auc['micro'])
-        #print('roc_auc Macro', roc_auc['macro'])
-        fig, ax = plt.subplots(figsize=(6, 6))
-        plt.plot(
-            fpr["micro"],
-            tpr["micro"],
-            label=f"micro-average ROC curve (AUC = {roc_auc['micro']:.2f})",
-            color="deeppink",
-            linestyle=":",
-            linewidth=4,
-        )
-        plt.plot(
-            fpr["macro"],
-            tpr["macro"],
-            label=f"macro-average ROC curve (AUC = {roc_auc['macro']:.2f})",
-            color="navy",
-            linestyle=":",
-            linewidth=4,
-        )
-        colors_list = ['red', 'green', 'blue', 'yellow', 'orange', 'purple', 'pink', 'brown', 'gray', 'cyan']
-        colors_list = colors_list[:len(labels)+2]
-        colors = cycle(colors_list)
-        for class_id, color in zip(range(len(labels)), colors):
-            RocCurveDisplay.from_predictions(
-                Y_act[:, class_id],
-                Y_pred[:, class_id],
-                name=f"ROC curve for {labels[class_id]}",
-                color=color,
-                ax=ax,
-            )
-        plt.axis("square")
-        plt.xlabel("Specificity")
-        plt.ylabel("Sensitivity")
-        plt.title("Receiver Operating Characteristic\nto One vs All Multi=class")
-        plt.legend()
+            mean_tpr = np.zeros_like(fpr_grid)
+            for i in range(n_classes):
+                mean_tpr += np.interp(fpr_grid, fpr[i], tpr[i]) 
+            #Compute AUC
+            mean_tpr /= n_classes
+            fpr_ma.append(fpr_grid)
+            tpr_ma.append(mean_tpr)
+            auc_ma.append(auc(fpr_ma[n], tpr_ma[n]))
+        plt.figure()
+        plt.plot(fpr_ma[0], tpr_ma[0], color='darkorange', lw=2, label=f'Neural Network (AUC = {auc_ma[0]:.2f})')
+        plt.plot(fpr_ma[1], tpr_ma[1], color='green', lw=2, label=f'SVM (AUC = {auc_ma[1]:.2f})')
+        plt.plot(fpr_ma[2], tpr_ma[2], color='blue', lw=2, label=f'Random Forest (AUC = {auc_ma[2]:.2f})')
+        plt.plot(fpr_ma[3], tpr_ma[3], color='red', lw=2, label=f'Gaussian NB (AUC = {auc_ma[3]:.2f})')
+        plt.plot(fpr_ma[4], tpr_ma[4], color='purple', lw=2, label=f'Logistic Regression (AUC = {auc_ma[4]:.2f})')
+        plt.plot([0, 1], [0, 1], color='black', lw=2, linestyle='--')
+        plt.xlim([0.0, 1.0])
+        plt.ylim([0.0, 1.05])
+        plt.xlabel('False Positive Rate')
+        plt.ylabel('True Positive Rate')
+        plt.title('Macro-Average Receiver Operating Characteristic (ROC)')
+        plt.legend(loc='lower right')
         plt.show()
 
 def make_SVM(X_train, Y_train): 
     if(len(np.unique(Y_train)) > 2):
-        model = SVC(decision_function_shape='ovo')
+        model = SVC(decision_function_shape='ovo', probability = True)
         model.fit(X_train, Y_train)
         print(f'SVM Training Accuracy - :{model.score(X_train, Y_train):.3f}')
         return model
     elif(len(np.unique(Y_train)) == 2):
-        model = SVC(gamma = 'auto')
+        model = SVC(gamma = 'auto', probability = True)
         model.fit(X_train, Y_train)
         print(f'SVM Training Accuracy - :{model.score(X_train, Y_train):.3f}')
         return model
@@ -277,21 +302,41 @@ def make_model(model, embeddings, labels, eval_size, balancing, scaling):
     #Make specificied models: 
     if(model == 'SVM'):
         model = make_SVM(X_train, Y_train)
-        Y_pred = model.predict(X_test)
+        Y_pred = model.predict_proba(X_test)
         print(f'SVM Test Accuracy - :{model.score(X_test, Y_test):.3f}')
         return Y_test, Y_pred
     elif(model == 'RF'):
         model = make_RF(X_train, Y_train)
-        Y_pred = model.predict(X_test)
+        Y_pred = model.predict_proba(X_test)
         print(f'Random Forest Test Accuracy - :{model.score(X_test, Y_test):.3f}')
-        return Y_test, Y_pred
+        return Y_pred
     elif(model == 'GNB'):
         model = make_GNB(X_train, Y_train)
-        Y_pred = model.predict(X_test)
+        Y_pred = model.predict_proba(X_test)
         print(f'GNB Test Accuracy - :{model.score(X_test, Y_test):.3f}')
-        return Y_test, Y_pred
+        return Y_pred
     elif(model == 'LOGREG'):
         model = make_LogReg(X_train, Y_train)
-        Y_pred = model.predict(X_test)
+        Y_pred = model.predict_proba(X_test)
         print(f' Logistic Regression Test Accuracy - :{model.score(X_test, Y_test):.3f}')
-        return Y_test, Y_pred
+        return Y_pred
+
+def plot_cms(cm_list, plt_labels):
+    #For Visualization: 
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    fig, axes = plt.subplots(nrows=2, ncols=3, figsize=(10, 8))
+    #Making subplot of all model Confusion Matrices: 
+    titles = ['Neural Network','SVM', 'Random Forest', 'GaussianNB', 'Logistic Regression']
+    for i, ax in enumerate(axes.flatten()):
+        if i < len(cm_list):
+            disp = cm_list[i]
+            disp.plot(cmap=plt.cm.Blues, ax=ax, values_format=".0f")
+            disp.ax_.set_title(titles[i])
+            disp.im_.colorbar.remove()
+            ax.set_xticklabels(plt_labels, rotation=45, ha="right")
+        if i >= len(cm_list):
+            ax.axis("off")
+    plt.tight_layout()
+    plt.show()
+
