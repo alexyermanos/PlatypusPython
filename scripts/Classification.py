@@ -40,6 +40,11 @@ from sklearn.preprocessing import StandardScaler
 #the batch size determines how many training samples are processed together. 
 #@param 'scaling' takes boolean input:
 #Uses the sklearn StandardScaler function to scale data
+#@param 'display', takes boolean input:
+#'display' = True, makes confusion matrices and ROC curves for all models.
+#@param 'patience', takes integer input greater than 0: Default is 25.
+#Determines how many epochs the model will train for with no decreases in loss.
+#Note: The larger the patience value the larger the chance of the neural network overfitting. 
 
 # @EXAMPLE:
 #import Classification.py as clf
@@ -48,7 +53,7 @@ from sklearn.preprocessing import StandardScaler
 # labels = metadata['labels']
 # clf.get_Classification(embeddings, labels) 
 # or 
-# clf.get_Classification(embeddings, labels, balancing=False, eval_size=0.2, epochs = 200, nodes = 100, batch_size= 16, scaling=True, display = True)
+# clf.get_Classification(embeddings, labels, balancing=False, eval_size=0.2, epochs = 200, nodes = 100, batch_size= 16, scaling=True, display = True, patience = 20)
 
 
 def get_Classification(embeddings, labels, balancing=False, eval_size=0.1, epochs=0, nodes=0, batch_size=32, scaling=False, display=False, patience=25):
