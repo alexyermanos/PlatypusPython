@@ -89,7 +89,7 @@ If you do not provide any argument the default will be passed.
 
 ### Arguments
 
-- `eval_size`: Used to determine subsect of data to be used to Evaluate model’s performances. default is `0.1`, input must be between 0-1.  
+- `eval_size`: Used to determine subsect of data to be used to Evaluate model’s performances. Default is `0.1`, input must be between 0-1.  
 - `balancing`: Balancing uses sklearn’s RandomOverSampling() of all minority classes so that the number of minority equals majority class. Takes a boolean as input, default is `True`. 
 - `scaling`: Scaling uses the sklearn’s StandardScaler function to scale data according to label. Takes boolean input, default is `False`.
 - `display`: Makes confusion matrices and ROC curves for all models. Takes Boolean input, default is `False`. 
