@@ -2,14 +2,14 @@
 
 ## Workflow
 
-The workflow takes as input either a Platypus VGM or a list of sequences in a CSV. Then the sequences are passed into a pretrained language model to make embedings and an optional UMAP for visualization.
+The workflow takes as input either a Platypus VGM or a list of sequences in a CSV. Then the sequences are passed into a pretrained language model to make embeddings and an optional UMAP for visualization.
 #
 ## Running the workflow
 
-- Create a new enviroment using Python3.8 as:
+- Create a new environment using Python3.8 as:
 `conda create -n plm python=3.8`
 
-- Activate the enviroment:
+- Activate the environment:
 `conda activate plm`
 
 - To install necessary libraries:
@@ -27,38 +27,38 @@ There are 3 different main modes:
 - `CSV` which assumes that the CSV is ready with the sequences, but the user has to provide the location of the CSV and can provide the name of the column
 #
 
-## Argumennts
+## Arguments
 
 - `data_path` path with the location of the CSV file or the location of the VGM depending on the mode
 - `vgm_colname` column in the vgm that contains the sequences (optional)
 - `folder_name` if TRUE then each run output will be stored in a folder with the time and date of execution
-- `umap` if True, it also created a UMAP based on the made embedings.
+- `umap` if True, it also created a UMAP based on the made embeddings.
 
-## Arguements per method
+## Arguments per method
 
 ### Ablang [\[code\]](https://github.com/oxpig/AbLang/tree/main) 
 - `chain`: input chain `heavy`(default) or `light`
-- `method`: `seqcoding` returns the average embeding from all tokens
+- `method`: `seqcoding` returns the average embedding from all tokens
 
 ### Antiberty [\[code\]](https://pypi.org/project/antiberty/)
-- `method`: strategy with which we get the embedings. Options `last`, `first`, `average`(default)
+- `method`: strategy with which we get the embeddings. Options `last`, `first`, `average`(default)
 
 ### Protbert[\[code\]](https://huggingface.co/Rostlab/prot_bert)
-- `method`: strategy with which we get the embedings. Options `last`, `first`, `average`(default), `pooler`
+- `method`: strategy with which we get the embeddings. Options `last`, `first`, `average`(default), `pooler`
 
 ### ESM2[\[code\]](https://huggingface.co/docs/transformers/model_doc/esm)
-- `method`: strategy with which we get the embedings. Options `last`, `first`, `average`(default)
+- `method`: strategy with which we get the embeddings. Options `last`, `first`, `average`(default)
 
 ### Sapiens[\[code\]](https://pypi.org/project/sapiens/)
-- `method`: layer from which to extract the embedings per sequence.
+- `method`: layer from which to extract the embeddings per sequence.
 - `chain`: input chain `H`(default) or `L`
 
 ### TCRBert[\[code\]](https://huggingface.co/wukevin/tcr-bert)
-- `method`: layer from which to extract the embedings per sequence.
+- `method`: layer from which to extract the embeddings per sequence.
 
-### How to pass arguements?
+### How to pass arguments?
 In the config.yml, add the line: `arguement` : `value`.\
-For example in `Sapiens` the arguements can look like: \
+For example in `Sapiens` the arguments can look like: \
 `method`: `average`\
 `chain`: `H`\
 If you do not provide any argument the default will be passed.
@@ -67,9 +67,33 @@ If you do not provide any argument the default will be passed.
 
 ## Adding new models
 
-- Create a .py file which will contain the model class in the folder `src/`. Be carefull that the name of the file is not the same as any of the packages that we are using
+- Create a .py file which will contain the model class in the folder `src/`. Be careful that the name of the file is not the same as any of the packages that we are using
 - Make a model class file like the others (simple example is the ablang_model). 
-    - Each class consists of a init function, where you initiallize things, like first making the wanted model and adding it to the self.model variable. 
-    - Then it contains a fit_predict which will use the predict function of the model, to get the embedings and print the output in a csv file.
-- Then add the import to the make_membedings.py which will use the model.
-- The user then can pick which model they want through the congig.yml `model` arguement
+- Each class consists of a init function, where you initialize things, like first making the wanted model and adding it to the self.model variable. 
+- Then it contains a fit_predict which will use the predict function of the model, to get the embeddings and print the output in a csv file.
+- Then add the import to the make_membeddings.py which will use the model.
+- The user then can pick which model they want through the congig.yml `model` argument
+
+## Classification of embeddings
+
+- Two required inputs, embeddings and labels, as pd.dataframe and np.array respectively.  
+
+### Arguments
+
+- 'eval_size': Used to determine subsect of data to be used to Evaluate model’s performances. default is ‘0.1’, input must be between 0-1.  
+- 'balancing': Balancing uses sklearn’s RandomOverSampling() of all minority classes so that the number of minority equals majority class. Takes a boolean as input, default is ‘True’. 
+- 'scaling': Scaling uses the sklearn’s StandardScaler function to scale data according to label. Takes boolean input, default is ‘False’.
+- ‘display’: Makes confusion matrices and ROC curves for all models. Takes Boolean input, default is ‘False’. 
+- ‘epochs’: Determines how many passes the model will undergo during configuration, used to update weight, bias, and parameter optimization. Takes a numeric input, default is 3 times the number of embedding columns.
+- ‘nodes’: Influences how many nodes will consist in the single layered neural network. Takes a numeric input, default is 1/2 the number of embedding columns.
+- ‘batch_size’: determines how many training samples are processed together. Takes a numeric value, default is ‘32’. 
+- ‘patience’: Determines how many epochs the model will train for with no decreases in loss. Takes integer input greater than 0, default is ‘25’.
+
+### Examples
+
+‘import Classification.py as clf’
+‘embeddings = pd.read_csv('embeddings.csv')’
+‘metadata = pd.read_csv('metadata')’
+‘labels = np.array(metadata['labels'])’
+Only required arguments: ‘clf.get_Classification(embeddings, labels)’
+Optional arguments: ‘clf.get_Classification(embeddings, labels, balancing = True, scaling = True, display = True, eval_size = 0.2, epochs = 200, nodes = 100, batch_size = 16, patience = 20)’
