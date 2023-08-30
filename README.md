@@ -100,9 +100,9 @@ If you do not provide any argument the default will be passed.
 
 ### Examples
 
-`import Classification.py as clf`
-`embeddings = pd.read_csv('embeddings.csv')`
-`metadata = pd.read_csv('metadata')`
-`labels = np.array(metadata['labels'])`
-Only required arguments: `clf.get_Classification(embeddings, labels)`
-Optional arguments: `clf.get_Classification(embeddings, labels, balancing = True, scaling = True, display = True, eval_size = 0.2, epochs = 200, nodes = 100, batch_size = 16, patience = 20)`
+`import Classification.py as clf`\
+`embeddings = pd.read_csv('embeddings.csv')`\
+`metadata = pd.read_csv('metadata')`\
+`labels = np.array(metadata['labels'])`\
+Only required arguments: `clf.get_Classification(embeddings, labels)`\
+Optional arguments: `clf.get_Classification(embeddings, labels, balancing = True, scaling = True, display = True, eval_size = 0.2, epochs = 200, nodes = 100, batch_size = 16, patience = 20)`\
