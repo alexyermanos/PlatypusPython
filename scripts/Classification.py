@@ -145,7 +145,7 @@ def make_NN(embeddings, labels, balancing, eval_size, epochs, nodes, batch_size,
     #If Binary Classification:
     if(len(set(labels))==2):
         print("Running Binary Classification")
-        callback = EarlyStopping(monitor='val_loss', patience=patience, mode = 'min')
+        callback = EarlyStopping(monitor='val_loss', patience=patience, mode = 'min', verbose = 1, min_delta = .01)
         model = Sequential()
         model.add(Dense(nodes, input_dim=(len(embeddings.columns)), activation='relu'))
         model.add(Dense(1, activation='sigmoid'))
@@ -158,7 +158,7 @@ def make_NN(embeddings, labels, balancing, eval_size, epochs, nodes, batch_size,
      #If Multi-class Classification:
     elif(len(set(labels))>2):
         print("Running Multi-class Classification")
-        callback = EarlyStopping(monitor='val_loss', patience=patience, mode = 'min')
+        callback = EarlyStopping(monitor='val_loss', patience=patience, mode = 'min', verbose = 1, min_delta = .01)
         model = Sequential()
         model.add(Dense(nodes, input_dim=(len(embeddings.columns)), activation='relu'))
         model.add(Dense(len(set(labels)), activation='softmax'))
