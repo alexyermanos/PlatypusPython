@@ -42,7 +42,7 @@ from sklearn.preprocessing import StandardScaler
 #Uses the sklearn StandardScaler function to scale data
 #@param 'display', takes boolean input:
 #'display' = True, makes confusion matrices and ROC curves for all models.
-#@param 'patience', takes integer input greater than 0: Default is 25.
+#@param 'patience', takes integer input greater than 0: Default is 10.
 #Determines how many epochs the model will train for with no decreases in loss.
 #Note: The larger the patience value the larger the chance of the neural network overfitting. 
 
@@ -56,7 +56,7 @@ from sklearn.preprocessing import StandardScaler
 # clf.get_Classification(embeddings, labels, balancing=False, eval_size=0.2, epochs = 200, nodes = 100, batch_size= 16, scaling=True, display = True, patience = 20)
 
 
-def get_Classification(embeddings, labels, balancing=False, eval_size=0.1, epochs=0, nodes=0, batch_size=32, scaling=False, display=False, patience=25):
+def get_Classification(embeddings, labels, balancing=False, eval_size=0.1, epochs=0, nodes=0, batch_size=32, scaling=False, display=False, patience=10):
     #Default epochs is three times the number of columns 
     if(epochs == 0): 
         epochs = len(embeddings.columns)*3
