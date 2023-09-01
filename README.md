@@ -87,7 +87,7 @@ If you do not provide any argument the default will be passed.
 
 ML classification for binary and multi-class labels.\
 Builds Neural Network, Support Vector Machine, Random Forest, Gaussian Naive Bayes, and Logistic Regression classifier models.\
-When `display = True` creates confusion matrices and ROC curves for each model.\
+When `display = True` creates confusion matrices and ROC curves for each model.
 - Two required inputs, embeddings and labels, as pd.dataframe and np.array respectively.  
 
 ### Arguments
