@@ -64,7 +64,6 @@ For example in `Sapiens` the arguments can look like: \
 If you do not provide any argument the default will be passed.
 #
 
-
 ## Adding new models
 
 - Create a .py file which will contain the model class in the folder `src/`. Be careful that the name of the file is not the same as any of the packages that we are using
@@ -72,16 +71,7 @@ If you do not provide any argument the default will be passed.
 - Each class consists of a init function, where you initialize things, like first making the wanted model and adding it to the self.model variable. 
 - Then it contains a fit_predict which will use the predict function of the model, to get the embeddings and print the output in a csv file.
 - Then add the import to the make_membeddings.py which will use the model.
-- The user then can pick which model they want through the congig.yml `model` argument
-
-## Adding new models
-
-- Create a .py file which will contain the model class in the folder `src/`. Be careful that the name of the file is not the same as any of the packages that we are using
-- Make a model class file like the others (simple example is the ablang_model). 
-- Each class consists of a init function, where you initialize things, like first making the wanted model and adding it to the self.model variable. 
-- Then it contains a fit_predict which will use the predict function of the model, to get the embeddings and print the output in a csv file.
-- Then add the import to the make_membeddings.py which will use the model.
-- The user then can pick which model they want through the congig.yml `model` argument
+- The user then can pick which model they want through the config.yml `model` argument
 
 ## Classification of embeddings
 
