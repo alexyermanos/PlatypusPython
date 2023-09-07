@@ -42,10 +42,10 @@ class TCRBert():
                 output = output.pooler_output[0]
                 
             elif self.method == "first":
-                output = output.last_hidden_state[0,-1,:]
+                output = output.last_hidden_state[0,0,:]
 
             elif self.method == "last":
-                output = output.last_hidden_state[0,0,:]
+                output = output.last_hidden_state[0,-1,:]
             
             embeddings.append(output.tolist())
         
