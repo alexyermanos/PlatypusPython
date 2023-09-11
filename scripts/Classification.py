@@ -46,10 +46,10 @@ from sklearn.preprocessing import StandardScaler
 #@param 'patience', takes integer input greater than 0: Default is 15.
 #Determines how many epochs the model will train for with no decreases in loss.
 #Note: The larger the patience value the larger the chance of the neural network overfitting.
-#@param 'noise', takes boolean input:
+#@param 'noise', takes boolean input, default is False:
 #Creates an initial Gaussian noise layer before hidden layers of neural network. 
-#@param 'return_model', takes boolean input:
-#Return the neural network made from the get_Classification function.
+#@param 'return_model', takes boolean input, default is False:
+#Returns the neural network made from the get_Classification function.
 #Note: if 'True' need to specify an output variable for the model. 
 
 # @EXAMPLE:
