@@ -77,7 +77,7 @@ If you do not provide any argument the default will be passed.
 
 ML classification for binary and multi-class labels.\
 Builds Neural Network, Support Vector Machine, Random Forest, Gaussian Naive Bayes, and Logistic Regression classifier models.\
-When `display = True` creates confusion matrices and ROC curves for each model.
+When `display = 'both'` creates confusion matrices and ROC curves for each model.
 - Two required inputs, embeddings and labels, as pd.dataframe and np.array respectively.  
 
 ### Arguments
@@ -85,11 +85,14 @@ When `display = True` creates confusion matrices and ROC curves for each model.
 - `eval_size`: Used to determine subsect of data to be used to Evaluate model’s performances. Default is `0.1`, input must be between 0-1.  
 - `balancing`: Balancing uses sklearn’s RandomOverSampling() of all minority classes so that the number of minority equals majority class. Takes a boolean as input, default is `True`. 
 - `scaling`: Scaling uses the sklearn’s StandardScaler function to scale data according to label. Takes boolean input, default is `False`.
-- `display`: Makes confusion matrices and ROC curves for all models. Takes Boolean input, default is `False`. 
+- `display`: Makes confusion matrices and ROC curves for all models. Takes four inputs (`'none'`, `'both'`, `'cm'`, and `'roc'`), default is `'none'`. 
 - `epochs`: Determines how many passes the model will undergo during configuration, used to update weight, bias, and parameter optimization. Takes a numeric input, default is 3 times the number of embedding columns.
 - `nodes`: Influences how many nodes will consist in the single layered neural network. Takes a numeric input, default is 1/2 the number of embedding columns.
 - `batch_size`: determines how many training samples are processed together. Takes a numeric value, default is `32`. 
 - `patience`: Determines how many epochs the model will train for with no decreases in loss. Takes integer input greater than 0, default is `25`.
+- `noise`: Creates an initial Gaussian noise layer before hidden layers of neural network. Takes boolean input, default is `False`.
+- `return_model`: Returns the neural network made from the get_Classification function. Takes boolean input, default is `False`.
+#
 
 ### Examples
 
