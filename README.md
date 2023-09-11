@@ -89,7 +89,7 @@ When `display = 'both'` creates confusion matrices and ROC curves for each model
 - `epochs`: Determines how many passes the model will undergo during configuration, used to update weight, bias, and parameter optimization. Takes a numeric input, default is 3 times the number of embedding columns.
 - `nodes`: Influences how many nodes will consist in the single layered neural network. Takes a numeric input, default is 1/2 the number of embedding columns.
 - `batch_size`: determines how many training samples are processed together. Takes a numeric value, default is `32`. 
-- `patience`: Determines how many epochs the model will train for with no decreases in loss. Takes integer input greater than 0, default is `25`.
+- `patience`: Determines how many epochs the model will train for with no decreases in loss. Takes integer input greater than 0, default is `15`.
 - `noise`: Creates an initial Gaussian noise layer before hidden layers of neural network. Takes boolean input, default is `False`.
 - `return_model`: Returns the neural network made from the get_Classification function. Takes boolean input, default is `False`.
 #
