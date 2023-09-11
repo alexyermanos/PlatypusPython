@@ -76,8 +76,8 @@ elif settings["model"] == "Sapiens":
 elif settings["model"] == 'TCRBert':
     print("Training TCRBERT")
     data = pd.read_csv(sys.argv[1])['sequence']
-    if "layer" in settings:
-        model = TCRBert(settings["layer"],file_name=sys.argv[3])
+    if "method" in settings:
+        model = TCRBert(settings["method"],file_name=sys.argv[3])
     else:
         model = TCRBert("average",file_name=sys.argv[3])
 
