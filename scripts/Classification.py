@@ -41,11 +41,16 @@ from sklearn.preprocessing import StandardScaler
 #the batch size determines how many training samples are processed together. 
 #@param 'scaling' takes boolean input:
 #Uses the sklearn StandardScaler function to scale data
-#@param 'display', takes boolean input:
-#'display' = True, makes confusion matrices and ROC curves for all models.
-#@param 'patience', takes integer input greater than 0: Default is 25.
+#@param 'display' takes four inputs ('both', 'none', 'cm', or 'roc'), default is 'none':
+#'display' = 'both', makes confusion matrices and ROC curves for all models.
+#@param 'patience', takes integer input greater than 0: Default is 15.
 #Determines how many epochs the model will train for with no decreases in loss.
-#Note: The larger the patience value the larger the chance of the neural network overfitting. 
+#Note: The larger the patience value the larger the chance of the neural network overfitting.
+#@param 'noise', takes boolean input:
+#Creates an initial Gaussian noise layer before hidden layers of neural network. 
+#@param 'return_model', takes boolean input:
+#Return the neural network made from the get_Classification function.
+#Note: if 'True' need to specify an output variable for the model. 
 
 # @EXAMPLE:
 #import Classification.py as clf
@@ -54,10 +59,10 @@ from sklearn.preprocessing import StandardScaler
 # labels = metadata['labels']
 # clf.get_Classification(embeddings, labels) 
 # or 
-# clf.get_Classification(embeddings, labels, balancing=False, eval_size=0.2, epochs = 200, nodes = 100, batch_size= 16, scaling=True, display = True, patience = 25)
+# clf.get_Classification(embeddings, labels, balancing=False, eval_size=0.2, epochs = 200, nodes = 100, batch_size= 16, scaling=True, display = True, patience = 20)
 
 
-def get_Classification(embeddings, labels, balancing=False, eval_size=0.1, epochs=0, nodes=0, batch_size=32, scaling=False, display=False, patience=10):
+def get_Classification(embeddings, labels, balancing=False, eval_size=0.1, epochs=0, nodes=0, batch_size=32, scaling=False, display='none', patience=15, noise = False, return_model=False):
     #Default epochs is three times the number of columns 
     if(epochs == 0): 
         epochs = len(embeddings.columns)*3
@@ -67,7 +72,7 @@ def get_Classification(embeddings, labels, balancing=False, eval_size=0.1, epoch
     plt_labels = list(np.unique(labels))
     #Make Model and Subset Evaluation Data
     model, X_eval, Y_eval = make_NN(embeddings, labels, balancing = balancing, eval_size = eval_size, epochs = epochs,
-                                                nodes = nodes, batch_size = batch_size, scale = scaling, patience = patience)
+                                                nodes = nodes, batch_size = batch_size, scale = scaling, patience = patience, noise = noise)
     Y_eval = np.array(Y_eval)
     #Get probabilites from NN
     Y_pred = model.predict(X_eval)
@@ -89,27 +94,32 @@ def get_Classification(embeddings, labels, balancing=False, eval_size=0.1, epoch
     print('Making Logistic Regression Model') 
     LGR_pred = make_model('LOGREG', embeddings, labels, eval_size, balancing, scaling)
     print('LGR Report', classification_report(Y_test, prob2pred(LGR_pred, len(plt_labels)), target_names = plt_labels))
-    if(display == True):
+    if(display != 'none'):
         #NN Confusion Matrices: 
-        if(len(plt_labels) == 2):
-            nn_cm = get_CM(Y_eval, np.round(Y_pred.max(axis=1)).astype(int), plt_labels)
-        else:
-            nn_cm = get_CM(Y_eval.argmax(axis=1), Y_pred.argmax(axis=1), plt_labels)
-        #SVM Confusion Matrices: 
-        svm_cm = get_CM(Y_test, prob2pred(SVM_pred, len(plt_labels)), plt_labels)
-        #RF Confusion Matrices:
-        rf_cm = get_CM(Y_test, prob2pred(RF_pred, len(plt_labels)), plt_labels)
-        #GNB Confusion Matrix
-        gnb_cm = get_CM(Y_test, prob2pred(GNB_pred, len(plt_labels)), plt_labels)
-        #LGR Confusion Matrix
-        lgr_cm = get_CM(Y_test, prob2pred(LGR_pred, len(plt_labels)), plt_labels)
-        #Plot Confusion Matrices
-        plot_cms([nn_cm, svm_cm, rf_cm, gnb_cm, lgr_cm], plt_labels)
-        #Plot ROCs 
-        if(len(plt_labels)==2):
-            make_ROC(Y_eval, [Y_pred,SVM_pred[:,1], RF_pred[:,1], GNB_pred[:,1], LGR_pred[:,1]], plt_labels)
-        else: 
-            make_ROC(Y_eval, [Y_pred,SVM_pred, RF_pred, GNB_pred, LGR_pred], plt_labels)
+        if display == 'both' or display == 'cm' :
+            if(len(plt_labels) == 2):
+                nn_cm = get_CM(Y_eval, np.round(Y_pred.max(axis=1)).astype(int), plt_labels)
+            else:
+                nn_cm = get_CM(Y_eval.argmax(axis=1), Y_pred.argmax(axis=1), plt_labels)
+            #SVM Confusion Matrices: 
+            svm_cm = get_CM(Y_test, prob2pred(SVM_pred, len(plt_labels)), plt_labels)
+            #RF Confusion Matrices:
+            rf_cm = get_CM(Y_test, prob2pred(RF_pred, len(plt_labels)), plt_labels)
+            #GNB Confusion Matrix
+            gnb_cm = get_CM(Y_test, prob2pred(GNB_pred, len(plt_labels)), plt_labels)
+            #LGR Confusion Matrix
+            lgr_cm = get_CM(Y_test, prob2pred(LGR_pred, len(plt_labels)), plt_labels)
+            #Plot Confusion Matrices
+            plot_cms([nn_cm, svm_cm, rf_cm, gnb_cm, lgr_cm], plt_labels)
+            #Plot ROCs 
+        if display == 'both' or display == 'roc' :
+            if(len(plt_labels)==2):
+                make_ROC(Y_eval, [Y_pred,SVM_pred[:,1], RF_pred[:,1], GNB_pred[:,1], LGR_pred[:,1]], plt_labels)
+            else: 
+                make_ROC(Y_eval, [Y_pred,SVM_pred, RF_pred, GNB_pred, LGR_pred], plt_labels)
+    if return_model == True : 
+        print('Returning Neural Network')
+        return model
 
 #Coverts probabilites to predictions 
 def prob2pred(Y_prob, count):
@@ -119,7 +129,7 @@ def prob2pred(Y_prob, count):
         return Y_prob.argmax(axis=1)
 
 #Input Embeddings (DF) and labels (Array)
-def make_NN(embeddings, labels, balancing, eval_size, epochs, nodes, batch_size, scale, patience):
+def make_NN(embeddings, labels, balancing, eval_size, epochs, nodes, batch_size, scale, patience, noise):
     X = np.array(embeddings)
     #Encode labels: 
     encoder = LabelEncoder()
@@ -146,28 +156,32 @@ def make_NN(embeddings, labels, balancing, eval_size, epochs, nodes, batch_size,
     #If Binary Classification:
     if(len(set(labels))==2):
         print("Running Binary Classification")
-        callback = EarlyStopping(monitor='val_loss', patience=patience, mode = 'min', verbose = 1, min_delta = .01, restore_best_weights=True)
+        callback = EarlyStopping(monitor='val_loss', patience=patience, mode = 'min', verbose = 1, restore_best_weights=True)
         model = Sequential()
+        if(noise==True):
+            model.add(GaussianNoise(1))
         model.add(Dense(nodes, input_dim=(len(embeddings.columns)), activation='relu'))
         model.add(Dense(1, activation='sigmoid'))
         model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
         model.fit(X_train, Y_train, batch_size = batch_size, verbose = 1,
                     epochs = epochs, validation_data = (X_test, Y_test), callbacks=[callback], shuffle = False)
         _, accuracy = model.evaluate(X_test,Y_test)
-        print("Accuracy = ", (accuracy*100),"%")
+        print("Neural Network Evaluation Accuracy = ", (accuracy*100),"%")
         return model, X_eval, Y_eval
      #If Multi-class Classification:
     elif(len(set(labels))>2):
         print("Running Multi-class Classification")
-        callback = EarlyStopping(monitor='val_loss', patience=patience, mode = 'min', verbose = 1, min_delta = .01, restore_best_weights=True)
+        callback = EarlyStopping(monitor='val_loss', patience=patience, mode = 'min', verbose = 1, min_delta = .001, restore_best_weights=True)
         model = Sequential()
+        if(noise == True):
+            model.add(GaussianNoise(1))
         model.add(Dense(nodes, input_dim=(len(embeddings.columns)), activation='relu'))
         model.add(Dense(len(set(labels)), activation='softmax'))
         model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
         model.fit(X_train, Y_train, batch_size = batch_size, verbose = 1,
                     epochs = epochs, validation_data = (X_test, Y_test), callbacks=[callback], shuffle = False)
         _, accuracy = model.evaluate(X_eval,Y_eval)
-        print("Neural Network Eval Accuracy = ", (accuracy*100),"%")
+        print("Neural Network Evaluation Accuracy = ", (accuracy*100),"%")
         return model, X_eval, Y_eval
     
 def get_CM(Y_act, Y_pred, labels):
@@ -260,30 +274,30 @@ def make_SVM(X_train, Y_train):
     if(len(np.unique(Y_train)) > 2):
         model = SVC(decision_function_shape='ovo', probability = True)
         model.fit(X_train, Y_train)
-        print(f'SVM Training Accuracy - :{model.score(X_train, Y_train):.3f}')
+        print(f'SVM Evaluation Accuracy - :{model.score(X_train, Y_train):.3f}')
         return model
     elif(len(np.unique(Y_train)) == 2):
         model = SVC(gamma = 'auto', probability = True)
         model.fit(X_train, Y_train)
-        print(f'SVM Training Accuracy - :{model.score(X_train, Y_train):.3f}')
+        print(f'SVM Evaluation Accuracy - :{model.score(X_train, Y_train):.3f}')
         return model
 
 def make_RF(X_train, Y_train):
     model = RandomForestClassifier()
     model.fit(X_train, Y_train)
-    print(f'Random Forest Training Accuracy - :{model.score(X_train, Y_train):.3f}')
+    print(f'Random Forest Evaluation Accuracy - :{model.score(X_train, Y_train):.3f}')
     return model
 
 def make_GNB(X_train, Y_train):
     model = GaussianNB()
     model.fit(X_train, Y_train)
-    print(f'Gaussian Naive Bayes Training Accuracy - :{model.score(X_train, Y_train):.3f}')
+    print(f'Gaussian Naive Bayes Evaluation Accuracy - :{model.score(X_train, Y_train):.3f}')
     return model
 
 def make_LogReg(X_train, Y_train):
     model = LogisticRegression()
     model.fit(X_train, Y_train)
-    print(f'Logistic Regression Training Accuracy - :{model.score(X_train, Y_train):.3f}')
+    print(f'Logistic Regression Evaluation Accuracy - :{model.score(X_train, Y_train):.3f}')
     return model
 
 def make_model(model, embeddings, labels, eval_size, balancing, scaling):
@@ -344,4 +358,3 @@ def plot_cms(cm_list, plt_labels):
             ax.axis("off")
     plt.tight_layout()
     plt.show()
-
