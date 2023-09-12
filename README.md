@@ -101,4 +101,4 @@ When `display = 'both'` creates confusion matrices and ROC curves for each model
 `metadata = pd.read_csv('metadata')`\
 `labels = np.array(metadata['labels'])`\
 Only required arguments: `clf.get_Classification(embeddings, labels)`\
-Optional arguments: `clf.get_Classification(embeddings, labels, balancing = True, scaling = True, display = True, eval_size = 0.2, epochs = 200, nodes = 100, batch_size = 16, patience = 20)`
+Optional arguments: `clf.get_Classification(embeddings, labels, balancing = True, scaling = True, display = 'both', eval_size = 0.2, epochs = 200, nodes = 100, batch_size = 16, patience = 20)`
