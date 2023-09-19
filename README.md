@@ -23,6 +23,7 @@ The workflow takes as input either a Platypus VGM or a list of sequences in a CS
 ### Modes
 
 There are 3 different main modes:
+-`10x` which assumes that the input is 10x data, it will then create a VGM from these data and then a CSV with the sequences. If no GEX data are available, set `gex_input` attribute to `noGEX` or if only `.h5` is available use `h5` instead.
 - `VGM` which assumes that a VGM exists in the data folder named data.R which will create the CSV with the sequences.
 - `CSV` which assumes that the CSV is ready with the sequences, but the user has to provide the location of the CSV and can provide the name of the column
 #
@@ -50,7 +51,7 @@ There are 3 different main modes:
 - `method`: strategy with which we get the embeddings. Options `last`, `first`, `average`(default)
 
 ### Sapiens[\[code\]](https://pypi.org/project/sapiens/)
-- `method`: layer from which to extract the embeddings per sequence.
+- `method`: layer from which to extract the embeddings per sequence .
 - `chain`: input chain `H`(default) or `L`
 
 ### TCRBert[\[code\]](https://huggingface.co/wukevin/tcr-bert)
