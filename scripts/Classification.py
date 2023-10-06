@@ -269,7 +269,44 @@ def make_ROC(Y_test, prob_list, labels):
         plt.title('Macro-Average Receiver Operating Characteristic (ROC)')
         plt.legend(loc='lower right')
         plt.show()
-
+        #Precision Recall Curves
+        from sklearn.metrics import precision_recall_curve, average_precision_score
+        precision = dict()
+        recall = dict()
+        average_precision = dict()
+        precisions = []
+        recalls = []
+        avg_precisions = []
+        # Compute micro-average precision-recall curve and average precision
+        for i in range(len(prob_list)):
+            precision["micro"], recall["micro"], _ = precision_recall_curve(Y_test.ravel(), prob_list[i].ravel())
+            average_precision["micro"] = average_precision_score(Y_test, prob_list[i], average="micro")
+            precisions.append(precision["micro"])
+            recalls.append(recall["micro"])
+            avg_precisions.append(average_precision["micro"])
+        
+        plt.figure(figsize=(10, 6))
+        #Below comments is for individual classes ... too many lines
+#         for i in range(len(labels)):
+#             plt.plot(recall[i], precision[i], lw=2, label=f'Class {i} (AP = {average_precision[i]:0.2f})')
+        plt.plot(recalls[0], precisions[0], color = 'darkorange', lw=2, 
+                 label=f'NN Micro-average (AP = {avg_precisions[0]:0.2f})')
+        plt.plot(recalls[1], precisions[1],color = 'green', lw=2, 
+                 label=f'SVM Micro-average (AP = {avg_precisions[1]:0.2f})')
+        plt.plot(recalls[2], precisions[2],color = 'blue',lw=2, 
+                 label=f'RF Micro-average (AP = {avg_precisions[2]:0.2f})')
+        plt.plot(recalls[3], precisions[3], color = 'red', lw=2, 
+                 label=f'GNB Micro-average (AP = {avg_precisions[3]:0.2f})')
+        plt.plot(recalls[4], precisions[4], color = 'purple', lw=2, 
+                 label=f'LR Micro-average (AP = {avg_precisions[4]:0.2f})')
+        plt.axhline(y=1.0, color='gold', linestyle='--', lw=2, label='Perfect Prediction')
+        plt.axhline(y=(1/len(labels)), color='black', linestyle='--', lw=2, label='Random Prediction')
+        plt.xlabel('Recall')
+        plt.ylabel('Precision')
+        plt.legend(loc='best')
+        plt.title('Precision-Recall Curve')
+        plt.grid()
+        plt.show()
 def make_SVM(X_train, Y_train): 
     if(len(np.unique(Y_train)) > 2):
         model = SVC(decision_function_shape='ovo', probability = True)
