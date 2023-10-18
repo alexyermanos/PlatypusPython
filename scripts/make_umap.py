@@ -20,7 +20,7 @@ metadata = metadata.reset_index()
 total = pd.merge(pd.DataFrame(proj), metadata, how = "inner")
 
 fig_2d = px.scatter(
-    total, x=0, y=1, color = total["sample"].astype(str)
+    total, x=0, y=1, color = total["sample"].astype(str), render_mode='svg'
 )
 
 fig_2d.update_layout(
