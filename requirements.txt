@@ -9,8 +9,9 @@ ablang
 sapiens
 antiberty
 fair-esm 
-pickle
+pickle-mixin
 scipy
 skorch
 scikit-learn
 keras
+umap
